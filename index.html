@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Put Away Log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <h1>Put Away Log</h1>
+        <p class="sub">Shared worker log for item number, quantity, location, and notes.</p>
+      </div>
+      <div id="sessionBox" class="session-box hidden">
+        <span id="sessionEmail"></span>
+        <span id="sessionRole" class="badge"></span>
+        <button id="signOutBtn" class="btn btn-secondary">Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="loginCard" class="card auth-card">
+        <h2>Sign in</h2>
+        <p class="muted">Use Firebase email/password accounts for temps, leads, and admins.</p>
+        <form id="loginForm" class="stack">
+          <label>
+            <span>Email</span>
+            <input id="email" type="email" placeholder="worker@email.com" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="password" type="password" placeholder="Password" required />
+          </label>
+          <button type="submit" class="btn">Sign in</button>
+          <p id="loginMsg" class="msg"></p>
+        </form>
+      </section>
+
+      <section id="appView" class="hidden">
+        <div class="grid two-col">
+          <section class="card">
+            <div class="card-head">
+              <h2>Put Away Entry</h2>
+              <button id="clearBtn" class="btn btn-secondary" type="button">Clear form</button>
+            </div>
+
+            <form id="putAwayForm" class="stack">
+              <div class="grid two-up">
+                <label>
+                  <span>Name</span>
+                  <select id="workerName" required>
+                    <option value="">Select worker</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Date</span>
+                  <input id="workDate" type="date" required />
+                </label>
+              </div>
+
+              <div class="table-wrap">
+                <table class="entry-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Item Number</th>
+                      <th>Quantity</th>
+                      <th>Location</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lineItemsBody"></tbody>
+                </table>
+              </div>
+
+              <div class="totals-row">
+                <div class="metric">
+                  <span>Total lines used</span>
+                  <strong id="usedLines">0</strong>
+                </div>
+                <div class="metric">
+                  <span>Total quantity</span>
+                  <strong id="totalQty">0</strong>
+                </div>
+              </div>
+
+              <button type="submit" class="btn">Submit put away log</button>
+              <p id="formMsg" class="msg"></p>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>Recent Logs</h2>
+              <button id="exportBtn" class="btn btn-secondary" type="button">Export CSV</button>
+            </div>
+
+            <div class="filters">
+              <input id="searchInput" type="text" placeholder="Search name, item, location..." />
+              <input id="filterDate" type="date" />
+            </div>
+
+            <div class="table-wrap recent-wrap">
+              <table class="recent-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Lines</th>
+                    <th>Qty</th>
+                    <th>Preview</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                  <tr><td colspan="5" class="empty">No logs yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <section id="adminSection" class="card hidden">
+          <div class="card-head">
+            <h2>Admin: Worker Access</h2>
+          </div>
+          <div class="grid two-col admin-grid">
+            <form id="employeeForm" class="stack">
+              <h3>Add worker to dropdown</h3>
+              <label>
+                <span>Display name</span>
+                <input id="employeeName" type="text" placeholder="Jane Smith" required />
+              </label>
+              <button type="submit" class="btn">Add worker</button>
+              <p id="employeeMsg" class="msg"></p>
+            </form>
+
+            <div>
+              <h3>Active workers</h3>
+              <div id="employeeList" class="employee-list"></div>
+            </div>
+          </div>
+          <p class="muted small">To fully remove sign-in access, disable or delete the user in Firebase Authentication. Turning a worker off here removes them from the dropdown.</p>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
