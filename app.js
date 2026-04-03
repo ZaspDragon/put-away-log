@@ -26,13 +26,14 @@ import {
 // Replace with your own Firebase project config.
 // -------------------------------
 const firebaseConfig = {
-  apiKey: 'REPLACE_ME',
-  authDomain: 'REPLACE_ME.firebaseapp.com',
-  projectId: 'REPLACE_ME',
-  storageBucket: 'REPLACE_ME.appspot.com',
-  messagingSenderId: 'REPLACE_ME',
-  appId: 'REPLACE_ME',
-};
+    apiKey: "AIzaSyAAJgxXqBqKgvWnNIIBaG72iwiZ3PFykoU",
+    authDomain: "put-away-log-cw.firebaseapp.com",
+    projectId: "put-away-log-cw",
+    storageBucket: "put-away-log-cw.firebasestorage.app",
+    messagingSenderId: "23183103971",
+    appId: "1:23183103971:web:75f097b4270cd38874f2d6"
+  };
+
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
