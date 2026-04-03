@@ -14,10 +14,10 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
   limit,
   serverTimestamp,
   onSnapshot,
+  orderBy,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // -------------------------------
@@ -84,6 +84,7 @@ function setToday() {
 }
 
 function setMessage(el, text = '', type = '') {
+  if (!el) return;
   el.textContent = text;
   el.className = 'msg';
   if (type) el.classList.add(type);
@@ -290,15 +291,24 @@ async function loadUserProfile(uid) {
 function watchEmployees() {
   const q = query(
     collection(db, 'employees'),
-    where('active', '==', true),
-    orderBy('name')
+    where('active', '==', true)
   );
 
-  return onSnapshot(q, (snapshot) => {
-    activeEmployees = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderEmployeeDropdown();
-    renderEmployeeList();
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      activeEmployees = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      renderEmployeeDropdown();
+      renderEmployeeList();
+    },
+    (error) => {
+      console.error('watchEmployees error:', error);
+      setMessage(employeeMsg, error.message, 'error');
+    }
+  );
 }
 
 function watchLogs() {
@@ -308,10 +318,17 @@ function watchLogs() {
     limit(100)
   );
 
-  return onSnapshot(q, (snapshot) => {
-    allLogs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderLogs();
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      allLogs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderLogs();
+    },
+    (error) => {
+      console.error('watchLogs error:', error);
+      setMessage(formMsg, error.message, 'error');
+    }
+  );
 }
 
 // -------------------------------
