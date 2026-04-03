@@ -11,7 +11,6 @@ import {
   addDoc,
   doc,
   getDoc,
-  getDocs,
   updateDoc,
   query,
   where,
@@ -23,22 +22,23 @@ import {
 
 // -------------------------------
 // FIREBASE CONFIG
-// Replace with your own Firebase project config.
 // -------------------------------
 const firebaseConfig = {
-    apiKey: "AIzaSyAAJgxXqBqKgvWnNIIBaG72iwiZ3PFykoU",
-    authDomain: "put-away-log-cw.firebaseapp.com",
-    projectId: "put-away-log-cw",
-    storageBucket: "put-away-log-cw.firebasestorage.app",
-    messagingSenderId: "23183103971",
-    appId: "1:23183103971:web:75f097b4270cd38874f2d6"
-  };
-
+  apiKey: "AIzaSyAAJgxXqBqKgvWnNIIBaG72iwiZ3PFykoU",
+  authDomain: "put-away-log-cw.firebaseapp.com",
+  projectId: "put-away-log-cw",
+  storageBucket: "put-away-log-cw.firebasestorage.app",
+  messagingSenderId: "23183103971",
+  appId: "1:23183103971:web:75f097b4270cd38874f2d6"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// -------------------------------
+// DOM REFERENCES
+// -------------------------------
 const loginCard = document.getElementById('loginCard');
 const appView = document.getElementById('appView');
 const sessionBox = document.getElementById('sessionBox');
@@ -49,6 +49,8 @@ const adminSection = document.getElementById('adminSection');
 const loginForm = document.getElementById('loginForm');
 const loginMsg = document.getElementById('loginMsg');
 const signOutBtn = document.getElementById('signOutBtn');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
 
 const putAwayForm = document.getElementById('putAwayForm');
 const workerName = document.getElementById('workerName');
@@ -72,7 +74,11 @@ const employeeList = document.getElementById('employeeList');
 let currentUserProfile = null;
 let allLogs = [];
 let activeEmployees = [];
+let unsubs = [];
 
+// -------------------------------
+// HELPERS
+// -------------------------------
 function setToday() {
   workDate.value = new Date().toISOString().slice(0, 10);
 }
@@ -127,6 +133,7 @@ function clearForm() {
   putAwayForm.reset();
   setToday();
   buildLineRows();
+  updateTotals();
   setMessage(formMsg);
 }
 
@@ -139,6 +146,7 @@ function csvEscape(value) {
 function downloadCSV(rows) {
   const header = ['date', 'name', 'line', 'itemNumber', 'quantity', 'location', 'notes'];
   const csv = [header.join(',')];
+
   rows.forEach((row) => {
     row.lines.forEach((line) => {
       csv.push([
@@ -152,6 +160,7 @@ function downloadCSV(rows) {
       ].map(csvEscape).join(','));
     });
   });
+
   const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -161,21 +170,30 @@ function downloadCSV(rows) {
   URL.revokeObjectURL(url);
 }
 
+// -------------------------------
+// RENDER
+// -------------------------------
 function renderEmployeeDropdown() {
   const current = workerName.value;
   workerName.innerHTML = '<option value="">Select worker</option>';
+
   activeEmployees.forEach((emp) => {
     const opt = document.createElement('option');
     opt.value = emp.name;
     opt.textContent = emp.name;
     workerName.appendChild(opt);
   });
-  if ([...workerName.options].some((o) => o.value === current)) workerName.value = current;
+
+  if ([...workerName.options].some((o) => o.value === current)) {
+    workerName.value = current;
+  }
 }
 
 function renderEmployeeList() {
   if (!employeeList) return;
+
   employeeList.innerHTML = '';
+
   if (!activeEmployees.length) {
     employeeList.innerHTML = '<div class="empty">No active workers yet.</div>';
     return;
@@ -189,15 +207,21 @@ function renderEmployeeList() {
         <div class="name">${emp.name}</div>
         <div class="meta">Active worker dropdown option</div>
       </div>
-      <button class="btn btn-secondary" data-id="${emp.id}">Remove</button>
+      <button class="secondary" type="button">Remove</button>
     `;
+
     row.querySelector('button').addEventListener('click', async () => {
       try {
-        await updateDoc(doc(db, 'employees', emp.id), { active: false, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, 'employees', emp.id), {
+          active: false,
+          updatedAt: serverTimestamp(),
+        });
+        setMessage(employeeMsg, 'Worker removed from dropdown.', 'success');
       } catch (err) {
         setMessage(employeeMsg, err.message, 'error');
       }
     });
+
     employeeList.appendChild(row);
   });
 }
@@ -219,6 +243,7 @@ function renderLogs() {
   });
 
   logsTableBody.innerHTML = '';
+
   if (!filtered.length) {
     logsTableBody.innerHTML = '<tr><td colspan="5" class="empty">No matching logs.</td></tr>';
     return;
@@ -243,20 +268,32 @@ function renderLogs() {
   });
 }
 
+// -------------------------------
+// FIREBASE LOADERS
+// -------------------------------
 async function loadUserProfile(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
+
   if (!snap.exists()) {
     throw new Error('No user profile found in Firestore users collection.');
   }
+
   const data = snap.data();
+
   if (data.active === false) {
     throw new Error('Your account has been turned off.');
   }
+
   return { id: snap.id, ...data };
 }
 
 function watchEmployees() {
-  const q = query(collection(db, 'employees'), where('active', '==', true), orderBy('name'));
+  const q = query(
+    collection(db, 'employees'),
+    where('active', '==', true),
+    orderBy('name')
+  );
+
   return onSnapshot(q, (snapshot) => {
     activeEmployees = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderEmployeeDropdown();
@@ -265,18 +302,31 @@ function watchEmployees() {
 }
 
 function watchLogs() {
-  const q = query(collection(db, 'putAwayLogs'), orderBy('createdAt', 'desc'), limit(100));
+  const q = query(
+    collection(db, 'putAwayLogs'),
+    orderBy('createdAt', 'desc'),
+    limit(100)
+  );
+
   return onSnapshot(q, (snapshot) => {
     allLogs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderLogs();
   });
 }
 
+// -------------------------------
+// EVENTS
+// -------------------------------
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   setMessage(loginMsg, 'Signing in...');
+
   try {
-    await signInWithEmailAndPassword(auth, email.value.trim(), password.value);
+    await signInWithEmailAndPassword(
+      auth,
+      emailInput.value.trim(),
+      passwordInput.value
+    );
     setMessage(loginMsg, 'Signed in.', 'success');
   } catch (err) {
     setMessage(loginMsg, err.message, 'error');
@@ -307,16 +357,19 @@ putAwayForm.addEventListener('submit', async (e) => {
     setMessage(formMsg, 'Pick a worker name.', 'error');
     return;
   }
+
   if (!workDate.value) {
     setMessage(formMsg, 'Choose a date.', 'error');
     return;
   }
+
   if (!lines.length) {
     setMessage(formMsg, 'Enter at least one line.', 'error');
     return;
   }
 
   const badLine = lines.find((l) => !l.itemNumber || !l.location || !l.quantity);
+
   if (badLine) {
     setMessage(formMsg, 'Each used line needs item number, quantity, and location.', 'error');
     return;
@@ -331,6 +384,7 @@ putAwayForm.addEventListener('submit', async (e) => {
       submittedByEmail: auth.currentUser.email,
       createdAt: serverTimestamp(),
     });
+
     setMessage(formMsg, 'Put away log submitted.', 'success');
     clearForm();
   } catch (err) {
@@ -338,20 +392,28 @@ putAwayForm.addEventListener('submit', async (e) => {
   }
 });
 
-employeeForm?.addEventListener('submit', async (e) => {
+employeeForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+
   if (!currentUserProfile || !['admin', 'lead'].includes(currentUserProfile.role)) {
     setMessage(employeeMsg, 'You do not have permission for that.', 'error');
     return;
   }
 
+  const newName = employeeName.value.trim();
+  if (!newName) {
+    setMessage(employeeMsg, 'Enter a worker name.', 'error');
+    return;
+  }
+
   try {
     await addDoc(collection(db, 'employees'), {
-      name: employeeName.value.trim(),
+      name: newName,
       active: true,
       createdAt: serverTimestamp(),
       createdByUid: auth.currentUser.uid,
     });
+
     employeeName.value = '';
     setMessage(employeeMsg, 'Worker added to dropdown.', 'success');
   } catch (err) {
@@ -359,8 +421,9 @@ employeeForm?.addEventListener('submit', async (e) => {
   }
 });
 
-let unsubs = [];
-
+// -------------------------------
+// AUTH STATE
+// -------------------------------
 onAuthStateChanged(auth, async (user) => {
   unsubs.forEach((fn) => fn());
   unsubs = [];
@@ -371,17 +434,25 @@ onAuthStateChanged(auth, async (user) => {
     appView.classList.add('hidden');
     sessionBox.classList.add('hidden');
     adminSection.classList.add('hidden');
+    setMessage(loginMsg);
     return;
   }
 
   try {
     currentUserProfile = await loadUserProfile(user.uid);
+
     loginCard.classList.add('hidden');
     appView.classList.remove('hidden');
     sessionBox.classList.remove('hidden');
+
     sessionEmail.textContent = user.email;
     sessionRole.textContent = currentUserProfile.role || 'worker';
-    adminSection.classList.toggle('hidden', !['admin', 'lead'].includes(currentUserProfile.role));
+
+    adminSection.classList.toggle(
+      'hidden',
+      !['admin', 'lead'].includes(currentUserProfile.role)
+    );
+
     unsubs.push(watchEmployees());
     unsubs.push(watchLogs());
   } catch (err) {
@@ -390,5 +461,9 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
+// -------------------------------
+// INIT
+// -------------------------------
 setToday();
 buildLineRows();
+updateTotals();
